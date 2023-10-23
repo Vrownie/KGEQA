@@ -2,6 +2,7 @@ import os
 import argparse
 from multiprocessing import cpu_count
 from utils.convert_csqa import convert_to_entailment
+from utils.convert_csqa_extract import convert_to_extraction_entailment
 from utils.convert_obqa import convert_to_obqa_statement
 from utils.conceptnet import extract_english, construct_graph
 from utils.grounding import create_matcher_patterns, ground
@@ -12,6 +13,11 @@ input_paths = {
         'train': './data/csqa/train_rand_split.jsonl',
         'dev': './data/csqa/dev_rand_split.jsonl',
         'test': './data/csqa/test_rand_split_no_answers.jsonl',
+    },
+    'csqa-extract': {
+        'train': './data/csqa_extract/train_rand_split.jsonl',
+        'dev': './data/csqa_extract/dev_rand_split.jsonl',
+        'test': './data/csqa_extract/test_rand_split_no_answers.jsonl',
     },
     'obqa': {
         'train': './data/obqa/OpenBookQA-V1-Sep2018/Data/Main/train.jsonl',
@@ -53,6 +59,23 @@ output_paths = {
             'adj-test': './data/csqa/graph/test.graph.adj.pk',
         },
     },
+    'csqa-extract': {
+        'statement': {
+            'train': './data/csqa_extract/statement/train.statement.jsonl',
+            'dev': './data/csqa_extract/statement/dev.statement.jsonl',
+            'test': './data/csqa_extract/statement/test.statement.jsonl',
+        },
+        'grounded': {
+            'train': './data/csqa_extract/grounded/train.grounded.jsonl',
+            'dev': './data/csqa_extract/grounded/dev.grounded.jsonl',
+            'test': './data/csqa_extract/grounded/test.grounded.jsonl',
+        },
+        'graph': {
+            'adj-train': './data/csqa_extract/graph/train.graph.adj.pk',
+            'adj-dev': './data/csqa_extract/graph/dev.graph.adj.pk',
+            'adj-test': './data/csqa_extract/graph/test.graph.adj.pk',
+        },
+    },
     'obqa': {
         'statement': {
             'train': './data/obqa/statement/train.statement.jsonl',
@@ -88,7 +111,7 @@ output_paths = {
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--run', default=['common'], choices=['common', 'csqa', 'hswag', 'anli', 'exp', 'scitail', 'phys', 'socialiqa', 'obqa', 'obqa-fact', 'make_word_vocab'], nargs='+')
+    parser.add_argument('--run', default=['common'], choices=['common', 'csqa', 'csqa-extract', 'hswag', 'anli', 'exp', 'scitail', 'phys', 'socialiqa', 'obqa', 'obqa-fact', 'make_word_vocab'], nargs='+')
     parser.add_argument('--path_prune_threshold', type=float, default=0.12, help='threshold for pruning paths')
     parser.add_argument('--max_node_num', type=int, default=200, help='maximum number of nodes per graph')
     parser.add_argument('-p', '--nprocs', type=int, default=cpu_count(), help='number of processes to use')
@@ -108,6 +131,7 @@ def main():
                                                output_paths['cpnet']['pruned-graph'], True)},
             {'func': create_matcher_patterns, 'args': (output_paths['cpnet']['vocab'], output_paths['cpnet']['patterns'])},
         ],
+
         'csqa': [
             {'func': convert_to_entailment, 'args': (input_paths['csqa']['train'], output_paths['csqa']['statement']['train'])},
             {'func': convert_to_entailment, 'args': (input_paths['csqa']['dev'], output_paths['csqa']['statement']['dev'])},
@@ -121,6 +145,21 @@ def main():
             {'func': generate_adj_data_from_grounded_concepts__use_LM, 'args': (output_paths['csqa']['grounded']['train'], output_paths['cpnet']['pruned-graph'], output_paths['cpnet']['vocab'], output_paths['csqa']['graph']['adj-train'], args.nprocs)},
             {'func': generate_adj_data_from_grounded_concepts__use_LM, 'args': (output_paths['csqa']['grounded']['dev'], output_paths['cpnet']['pruned-graph'], output_paths['cpnet']['vocab'], output_paths['csqa']['graph']['adj-dev'], args.nprocs)},
             {'func': generate_adj_data_from_grounded_concepts__use_LM, 'args': (output_paths['csqa']['grounded']['test'], output_paths['cpnet']['pruned-graph'], output_paths['cpnet']['vocab'], output_paths['csqa']['graph']['adj-test'], args.nprocs)},
+        ],
+
+        'csqa-extract': [
+            {'func': convert_to_extraction_entailment, 'args': (input_paths['csqa-extract']['train'], output_paths['csqa-extract']['statement']['train'])},
+            {'func': convert_to_extraction_entailment, 'args': (input_paths['csqa-extract']['dev'], output_paths['csqa-extract']['statement']['dev'])},
+            {'func': convert_to_extraction_entailment, 'args': (input_paths['csqa-extract']['test'], output_paths['csqa-extract']['statement']['test'])},
+            {'func': ground, 'args': (output_paths['csqa-extract']['statement']['train'], output_paths['cpnet']['vocab'],
+                                      output_paths['cpnet']['patterns'], output_paths['csqa-extract']['grounded']['train'], args.nprocs)},
+            {'func': ground, 'args': (output_paths['csqa-extract']['statement']['dev'], output_paths['cpnet']['vocab'],
+                                      output_paths['cpnet']['patterns'], output_paths['csqa-extract']['grounded']['dev'], args.nprocs)},
+            {'func': ground, 'args': (output_paths['csqa-extract']['statement']['test'], output_paths['cpnet']['vocab'],
+                                      output_paths['cpnet']['patterns'], output_paths['csqa-extract']['grounded']['test'], args.nprocs)},
+            {'func': generate_adj_data_from_grounded_concepts__use_LM, 'args': (output_paths['csqa-extract']['grounded']['train'], output_paths['cpnet']['pruned-graph'], output_paths['cpnet']['vocab'], output_paths['csqa-extract']['graph']['adj-train'], args.nprocs)},
+            {'func': generate_adj_data_from_grounded_concepts__use_LM, 'args': (output_paths['csqa-extract']['grounded']['dev'], output_paths['cpnet']['pruned-graph'], output_paths['cpnet']['vocab'], output_paths['csqa-extract']['graph']['adj-dev'], args.nprocs)},
+            {'func': generate_adj_data_from_grounded_concepts__use_LM, 'args': (output_paths['csqa-extract']['grounded']['test'], output_paths['cpnet']['pruned-graph'], output_paths['cpnet']['vocab'], output_paths['csqa-extract']['graph']['adj-test'], args.nprocs)},
         ],
 
         'obqa': [

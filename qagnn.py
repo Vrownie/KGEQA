@@ -130,11 +130,11 @@ def train(args):
     # try:
     if True:
         if torch.cuda.device_count() >= 2 and args.cuda:
-            device0 = torch.device("cuda:0")
-            device1 = torch.device("cuda:1")
+            device0 = torch.device("cuda:5")
+            device1 = torch.device("cuda:6")
         elif torch.cuda.device_count() == 1 and args.cuda:
-            device0 = torch.device("cuda:0")
-            device1 = torch.device("cuda:0")
+            device0 = torch.device("cuda:6")
+            device1 = torch.device("cuda:6")
         else:
             device0 = torch.device("cpu")
             device1 = torch.device("cpu")

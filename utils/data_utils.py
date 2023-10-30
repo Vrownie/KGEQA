@@ -182,7 +182,7 @@ def load_sparse_adj_data_with_contextnode(adj_pk_path, max_node_num, num_choice,
     ori_adj_mean  = adj_lengths_ori.float().mean().item()
     ori_adj_sigma = np.sqrt(((adj_lengths_ori.float() - ori_adj_mean)**2).mean().item())
     print('| ori_adj_len: mu {:.2f} sigma {:.2f} | adj_len: {:.2f} |'.format(ori_adj_mean, ori_adj_sigma, adj_lengths.float().mean().item()) +
-          ' prune_rate： {:.2f} |'.format((adj_lengths_ori > adj_lengths).float().mean().item()) +
+          ' prune_rate: {:.2f} |'.format((adj_lengths_ori > adj_lengths).float().mean().item()) +
           ' qc_num: {:.2f} | ac_num: {:.2f} |'.format((node_type_ids == 0).float().sum(1).mean().item(),
                                                       (node_type_ids == 1).float().sum(1).mean().item()))
 
@@ -280,7 +280,7 @@ def get_gpt_token_num():
 
 
 
-def load_bert_xlnet_roberta_input_tensors(statement_jsonl_path, model_type, model_name, max_seq_length):
+def load_bert_xlnet_roberta_input_tensors(statement_jsonl_path, model_type, model_name, max_seq_length, for_kgeqa=False):
     class InputExample(object):
 
         def __init__(self, example_id, question, contexts, endings, label=None):
@@ -325,6 +325,29 @@ def load_bert_xlnet_roberta_input_tensors(statement_jsonl_path, model_type, mode
                         label=label
                     ))
         return examples
+    
+    def read_examples_for_kgeqa(input_file):
+        with open(input_file, "r", encoding="utf-8") as f:
+            examples = []
+            for line in f.readlines():
+                json_dic = json.loads(line)
+                # choice = json_dic["answerKey"] if 'answerKey' in json_dic else "A"
+                label_text = json_dic["question"]["choices"][0]["text"]
+                
+                contexts = json_dic["question"]["stem"]
+                if "para" in json_dic:
+                    contexts = json_dic["para"] + " " + contexts
+                if "fact1" in json_dic:
+                    contexts = json_dic["fact1"] + " " + contexts
+                examples.append(
+                    InputExample(
+                        example_id=json_dic["id"],
+                        contexts=[contexts] * len(json_dic["question"]["choices"]),
+                        question="",
+                        endings=[ending["text"] for ending in json_dic["question"]["choices"]],
+                        label=label
+                    ))
+        return examples
 
     def convert_examples_to_features(examples, label_list, max_seq_length,
                                      tokenizer,
@@ -345,7 +368,7 @@ def load_bert_xlnet_roberta_input_tensors(statement_jsonl_path, model_type, mode
                 - True (XLNet/GPT pattern): A + [SEP] + B + [SEP] + [CLS]
             `cls_token_segment_id` define the segment id associated to the CLS token (0 for BERT, 2 for XLNet)
         """
-        label_map = {label: i for i, label in enumerate(label_list)}
+        # label_map = {label: i for i, label in enumerate(label_list)}
 
         features = []
         for ex_index, example in enumerate(tqdm(examples)):
@@ -421,8 +444,8 @@ def load_bert_xlnet_roberta_input_tensors(statement_jsonl_path, model_type, mode
                 assert len(input_mask) == max_seq_length
                 assert len(segment_ids) == max_seq_length
                 choices_features.append((tokens, input_ids, input_mask, segment_ids, output_mask))
-            label = label_map[example.label]
-            features.append(InputFeatures(example_id=example.example_id, choices_features=choices_features, label=label))
+            # label = label_map[example.label]
+            features.append(InputFeatures(example_id=example.example_id, choices_features=choices_features, label=example.label))
 
         return features
 
@@ -459,7 +482,10 @@ def load_bert_xlnet_roberta_input_tensors(statement_jsonl_path, model_type, mode
     #     tokenizer_class = {'bert': BertTokenizer, 'xlnet': XLNetTokenizer, 'roberta': RobertaTokenizer}.get(model_type)
     tokenizer_class = AutoTokenizer
     tokenizer = tokenizer_class.from_pretrained(model_name)
-    examples = read_examples(statement_jsonl_path)
+    if for_kgeqa: 
+        examples = read_examples_for_kgeqa(statement_jsonl_path)
+    else: 
+        examples = read_examples(statement_jsonl_path)
     features = convert_examples_to_features(examples, list(range(len(examples[0].endings))), max_seq_length, tokenizer,
                                             cls_token_at_end=bool(model_type in ['xlnet']),  # xlnet has a cls token at the end
                                             cls_token=tokenizer.cls_token,
@@ -483,6 +509,8 @@ def load_input_tensors(input_jsonl_path, model_type, model_name, max_seq_length)
     elif model_type in ('bert', 'xlnet', 'roberta', 'albert'):
         return load_bert_xlnet_roberta_input_tensors(input_jsonl_path, model_type, model_name, max_seq_length)
 
+def load_input_tensors_for_kgeqa(input_jsonl_path, model_type, model_name, max_seq_length):
+    return load_bert_xlnet_roberta_input_tensors(input_jsonl_path, model_type, model_name, max_seq_length, for_kgeqa=True)
 
 def load_info(statement_path: str):
     n = sum(1 for _ in open(statement_path, "r"))

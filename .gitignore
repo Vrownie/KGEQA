@@ -3,3 +3,9 @@
 .ipynb_checkpoints
 
 saved*
+
+data/*
+
+logs/*
+
+*.log

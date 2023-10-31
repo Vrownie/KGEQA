@@ -445,7 +445,9 @@ def load_bert_xlnet_roberta_input_tensors(statement_jsonl_path, model_type, mode
                 assert len(segment_ids) == max_seq_length
                 choices_features.append((tokens, input_ids, input_mask, segment_ids, output_mask))
             # label = label_map[example.label]
-            features.append(InputFeatures(example_id=example.example_id, choices_features=choices_features, label=example.label))
+            encodings = tokenizer(example.contexts[0])
+            label = [encodings.char_to_token(example.label[0]), encodings.char_to_token(example.label[1])]
+            features.append(InputFeatures(example_id=example.example_id, choices_features=choices_features, label=label))
 
         return features
 
@@ -481,7 +483,7 @@ def load_bert_xlnet_roberta_input_tensors(statement_jsonl_path, model_type, mode
     # except:
     #     tokenizer_class = {'bert': BertTokenizer, 'xlnet': XLNetTokenizer, 'roberta': RobertaTokenizer}.get(model_type)
     tokenizer_class = AutoTokenizer
-    tokenizer = tokenizer_class.from_pretrained(model_name)
+    tokenizer = tokenizer_class.from_pretrained(model_name, use_fast=True)
     if for_kgeqa: 
         examples = read_examples_for_kgeqa(statement_jsonl_path)
     else: 

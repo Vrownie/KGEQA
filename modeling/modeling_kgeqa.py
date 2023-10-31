@@ -119,7 +119,7 @@ class KGEQA(nn.Module):
 
         self.pooler = MultiheadAttPoolLayer(n_attention_head, sent_dim, concept_dim)
 
-        self.fc = MLP(concept_dim + sent_dim + concept_dim, fc_dim, 2, n_fc_layer, p_fc, layer_norm=True)
+        self.fc = MLP(concept_dim + sent_dim + concept_dim, fc_dim, 2 * sent_dim, n_fc_layer, p_fc, layer_norm=True)
 
         self.dropout_e = nn.Dropout(p_emb)
         self.dropout_fc = nn.Dropout(p_fc)
@@ -217,7 +217,7 @@ class LM_KGEQA(nn.Module):
                                                          -> (total E, )
         returns: (batch_size, 1)
         """
-        bs, nc, ds = inputs[0].size(0), inputs[0].size(1), inputs[0].size(2)
+        bs, nc = inputs[0].size(0), inputs[0].size(1)
 
         #Here, merge the batch dimension and the num_choice dimension
         edge_index_orig, edge_type_orig = inputs[-2:]
@@ -228,11 +228,13 @@ class LM_KGEQA(nn.Module):
         adj = (edge_index.to(node_type_ids.device), edge_type.to(node_type_ids.device)) #edge_index: [2, total_E]   edge_type: [total_E, ]
 
         sent_vecs, all_hidden_states = self.encoder(*lm_inputs, layer_id=layer_id)
+
+        ds = sent_vecs[0].size(0)
         logits, attn = self.decoder(sent_vecs.to(node_type_ids.device),
                                     concept_ids,
                                     node_type_ids, node_scores, adj_lengths, adj,
                                     emb_data=None, cache_output=cache_output)
-        logits = logits.view(bs, nc, 2)
+        logits = logits.view(bs, nc, ds, 2)
         if not detail:
             return logits, attn
         else:

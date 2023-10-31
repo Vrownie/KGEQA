@@ -57,9 +57,17 @@ def convert_qajson_to_entailment(qa_json: dict, ans_pos: bool):
     choices = qa_json["question"]["choices"]
     context_text = ""
     true_choice = None
+    cur_pos, start_pos, end_pos = 0, 0, 0
     for choice in choices:
         choice_label = choice["label"]
         choice_text = choice["text"]
+        cur_pos += len("One possible answer is ")
+        if choice_label == qa_json.get("answerKey", "A"):
+            start_pos = cur_pos
+        cur_pos += len(choice_text)
+        if choice_label == qa_json.get("answerKey", "A"):
+            end_pos = cur_pos
+        cur_pos += len(". ")
         context_text += f"One possible answer is {choice_text}. "
 
     for choice in choices:
@@ -76,6 +84,8 @@ def convert_qajson_to_entailment(qa_json: dict, ans_pos: bool):
 
     qa_json["question"]["stem"] = context_text + question_text
     qa_json["question"]["choices"] = [true_choice]
+    qa_json["answerStart"] = start_pos
+    qa_json["answerEnd"] = end_pos
 
     return qa_json
 

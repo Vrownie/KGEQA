@@ -222,8 +222,8 @@ def train(args):
         #     loss = loss_func(correct_logits, wrong_logits, y)  # margin ranking loss
         # elif args.loss == 'cross_entropy':
         #     loss = loss_func(logits, labels)
-        loss_func = nn.CrossEntropyLoss(reduction='mean')
-        return loss_func(logits, labels)
+        loss_func = nn.MSELoss(reduction='mean')
+        return loss_func(logits.squeeze(), labels.float().squeeze())
 
     ###################################################################################################
     #   Training                                                                                      #
@@ -256,12 +256,12 @@ def train(args):
                     if args.fp16:
                         with torch.cuda.amp.autocast():
                             logits, _ = model(*[x[a:b] for x in input_data], layer_id=args.encoder_layer)
-                            import pdb; pdb.set_trace()
                             loss = compute_loss(logits, labels[a:b])
                     else:
                         logits, _ = model(*[x[a:b] for x in input_data], layer_id=args.encoder_layer)
                         loss = compute_loss(logits, labels[a:b])
                     loss = loss * (b - a) / bs
+                    # import pdb; pdb.set_trace()
                     if args.fp16:
                         scaler.scale(loss).backward()
                     else:

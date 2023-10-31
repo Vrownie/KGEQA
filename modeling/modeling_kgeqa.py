@@ -119,7 +119,7 @@ class KGEQA(nn.Module):
 
         self.pooler = MultiheadAttPoolLayer(n_attention_head, sent_dim, concept_dim)
 
-        self.fc = MLP(concept_dim + sent_dim + concept_dim, fc_dim, sent_dim * 2, n_fc_layer, p_fc, layer_norm=True)
+        self.fc = MLP(concept_dim + sent_dim + concept_dim, fc_dim, 2, n_fc_layer, p_fc, layer_norm=True)
 
         self.dropout_e = nn.Dropout(p_emb)
         self.dropout_fc = nn.Dropout(p_fc)
@@ -232,7 +232,7 @@ class LM_KGEQA(nn.Module):
                                     concept_ids,
                                     node_type_ids, node_scores, adj_lengths, adj,
                                     emb_data=None, cache_output=cache_output)
-        logits = logits.view(bs, nc, ds, 2)
+        logits = logits.view(bs, nc, 2)
         if not detail:
             return logits, attn
         else:

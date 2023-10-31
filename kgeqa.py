@@ -29,14 +29,20 @@ print ("gpu: %s" % subprocess.check_output('echo $CUDA_VISIBLE_DEVICES', shell=T
 
 
 def evaluate_accuracy(eval_set, model):
-    n_samples, n_correct = 0, 0
+    n_samples, total_em, total_f1 = 0, 0, 0
     model.eval()
     with torch.no_grad():
         for qids, labels, *input_data in tqdm(eval_set):
             logits, _ = model(*input_data)
-            n_correct += (logits.argmax(1) == labels).sum().item()
+            s_e = logits.squeeze(1).argmax(1)
+            len_pred = torch.relu(s_e[..., 1] - s_e[..., 0])
+            len_true = torch.relu(labels[..., 1] - labels[..., 0])
+            len_match = torch.relu(torch.min(s_e[..., 1], labels[..., 1]) - torch.max(s_e[..., 0], labels[..., 0]))
+            precision, recall = len_match / len_pred, len_match / len_true
+            total_f1 += (2 * precision * recall / (precision + recall)).nan_to_num(0).sum().item()
+            total_em += (s_e == labels).sum().item()
             n_samples += labels.size(0)
-    return n_correct / n_samples
+    return total_em / n_samples, total_f1 / n_samples
 
 
 def main():
@@ -117,7 +123,7 @@ def train(args):
     export_config(args, config_path)
     check_path(model_path)
     with open(log_path, 'w') as fout:
-        fout.write('step,dev_acc,test_acc\n')
+        fout.write('step,dev_em,dev_f1,test_em,test_f1\n')
 
     ###################################################################################################
     #   Load data                                                                                     #
@@ -131,7 +137,7 @@ def train(args):
     # try:
     if True:
         if torch.cuda.device_count() >= 2 and args.cuda:
-            device0 = torch.device("cuda:5")
+            device0 = torch.device("cuda:6") # temp, force use 1 GPU
             device1 = torch.device("cuda:6")
         elif torch.cuda.device_count() == 1 and args.cuda:
             device0 = torch.device("cuda:6")
@@ -238,7 +244,7 @@ def train(args):
         scaler = torch.cuda.amp.GradScaler()
 
     global_step, best_dev_epoch = 0, 0
-    best_dev_acc, final_test_acc, total_loss = 0.0, 0.0, 0.0
+    best_dev_f1, final_test_f1, total_loss = 0.0, 0.0, 0.0
     start_time = time.time()
     model.train()
     freeze_net(model.encoder)
@@ -290,37 +296,38 @@ def train(args):
                 global_step += 1
 
             model.eval()
-            dev_acc = evaluate_accuracy(dataset.dev(), model)
+            dev_em, dev_f1 = evaluate_accuracy(dataset.dev(), model)
             save_test_preds = args.save_model
             if not save_test_preds:
-                test_acc = evaluate_accuracy(dataset.test(), model) if args.test_statements else 0.0
+                test_em, test_f1 = evaluate_accuracy(dataset.test(), model) if args.test_statements else 0.0
             else:
-                eval_set = dataset.test()
-                total_acc = []
-                count = 0
-                preds_path = os.path.join(args.save_dir, 'test_e{}_preds.csv'.format(epoch_id))
-                with open(preds_path, 'w') as f_preds:
-                    with torch.no_grad():
-                        for qids, labels, *input_data in tqdm(eval_set):
-                            count += 1
-                            logits, _, concept_ids, node_type_ids, edge_index, edge_type = model(*input_data, detail=True)
-                            predictions = logits.argmax(1) #[bsize, ]
-                            preds_ranked = (-logits).argsort(1) #[bsize, n_choices]
-                            for i, (qid, label, pred, _preds_ranked, cids, ntype, edges, etype) in enumerate(zip(qids, labels, predictions, preds_ranked, concept_ids, node_type_ids, edge_index, edge_type)):
-                                acc = int(pred.item()==label.item())
-                                print ('{},{}'.format(qid, chr(ord('A') + pred.item())), file=f_preds)
-                                f_preds.flush()
-                                total_acc.append(acc)
-                test_acc = float(sum(total_acc))/len(total_acc)
+                raise NotImplementedError("save_test_preds not supported")
+                # eval_set = dataset.test()
+                # total_acc = []
+                # count = 0
+                # preds_path = os.path.join(args.save_dir, 'test_e{}_preds.csv'.format(epoch_id))
+                # with open(preds_path, 'w') as f_preds:
+                #     with torch.no_grad():
+                #         for qids, labels, *input_data in tqdm(eval_set):
+                #             count += 1
+                #             logits, _, concept_ids, node_type_ids, edge_index, edge_type = model(*input_data, detail=True)
+                #             predictions = logits.argmax(1) #[bsize, ]
+                #             preds_ranked = (-logits).argsort(1) #[bsize, n_choices]
+                #             for i, (qid, label, pred, _preds_ranked, cids, ntype, edges, etype) in enumerate(zip(qids, labels, predictions, preds_ranked, concept_ids, node_type_ids, edge_index, edge_type)):
+                #                 acc = int(pred.item()==label.item())
+                #                 print ('{},{}'.format(qid, chr(ord('A') + pred.item())), file=f_preds)
+                #                 f_preds.flush()
+                #                 total_acc.append(acc)
+                # test_acc = float(sum(total_acc))/len(total_acc)
 
             print('-' * 71)
-            print('| epoch {:3} | step {:5} | dev_acc {:7.4f} | test_acc {:7.4f} |'.format(epoch_id, global_step, dev_acc, test_acc))
+            print('| epoch {:3} | step {:5} | dev_em {:7.4f} | dev_f1 {:7.4f} | test_em {:7.4f} | test_f1 {:7.4f} |'.format(epoch_id, global_step, dev_em, dev_f1, test_em, test_f1))
             print('-' * 71)
             with open(log_path, 'a') as fout:
-                fout.write('{},{},{}\n'.format(global_step, dev_acc, test_acc))
-            if dev_acc >= best_dev_acc:
-                best_dev_acc = dev_acc
-                final_test_acc = test_acc
+                fout.write('{},{},{},{},{}\n'.format(global_step, dev_em, dev_f1, test_em, test_f1))
+            if dev_f1 >= best_dev_f1:
+                best_dev_f1 = dev_f1
+                final_test_f1 = test_f1
                 best_dev_epoch = epoch_id
                 if args.save_model:
                     torch.save([model.state_dict(), args], f"{model_path}.{epoch_id}")
@@ -403,33 +410,34 @@ def eval_detail(args):
                                            subsample=args.subsample, use_cache=args.use_cache)
 
     save_test_preds = args.save_model
-    dev_acc = evaluate_accuracy(dataset.dev(), model)
-    print('dev_acc {:7.4f}'.format(dev_acc))
+    dev_em, dev_f1 = evaluate_accuracy(dataset.dev(), model)
+    print('dev_em {:7.4f} | dev_f1 {:7.4f}'.format(dev_em, dev_f1))
     if not save_test_preds:
-        test_acc = evaluate_accuracy(dataset.test(), model) if args.test_statements else 0.0
+        test_em, test_f1 = evaluate_accuracy(dataset.test(), model) if args.test_statements else 0.0
     else:
-        eval_set = dataset.test()
-        total_acc = []
-        count = 0
-        dt = datetime.datetime.today().strftime('%Y%m%d%H%M%S')
-        preds_path = os.path.join(args.save_dir, 'test_preds_{}.csv'.format(dt))
-        with open(preds_path, 'w') as f_preds:
-            with torch.no_grad():
-                for qids, labels, *input_data in tqdm(eval_set):
-                    count += 1
-                    logits, _, concept_ids, node_type_ids, edge_index, edge_type = model(*input_data, detail=True)
-                    predictions = logits.argmax(1) #[bsize, ]
-                    preds_ranked = (-logits).argsort(1) #[bsize, n_choices]
-                    for i, (qid, label, pred, _preds_ranked, cids, ntype, edges, etype) in enumerate(zip(qids, labels, predictions, preds_ranked, concept_ids, node_type_ids, edge_index, edge_type)):
-                        acc = int(pred.item()==label.item())
-                        print ('{},{}'.format(qid, chr(ord('A') + pred.item())), file=f_preds)
-                        f_preds.flush()
-                        total_acc.append(acc)
-        test_acc = float(sum(total_acc))/len(total_acc)
+        raise NotImplementedError("save_test_preds not supported")
+        # eval_set = dataset.test()
+        # total_acc = []
+        # count = 0
+        # dt = datetime.datetime.today().strftime('%Y%m%d%H%M%S')
+        # preds_path = os.path.join(args.save_dir, 'test_preds_{}.csv'.format(dt))
+        # with open(preds_path, 'w') as f_preds:
+        #     with torch.no_grad():
+        #         for qids, labels, *input_data in tqdm(eval_set):
+        #             count += 1
+        #             logits, _, concept_ids, node_type_ids, edge_index, edge_type = model(*input_data, detail=True)
+        #             predictions = logits.argmax(1) #[bsize, ]
+        #             preds_ranked = (-logits).argsort(1) #[bsize, n_choices]
+        #             for i, (qid, label, pred, _preds_ranked, cids, ntype, edges, etype) in enumerate(zip(qids, labels, predictions, preds_ranked, concept_ids, node_type_ids, edge_index, edge_type)):
+        #                 acc = int(pred.item()==label.item())
+        #                 print ('{},{}'.format(qid, chr(ord('A') + pred.item())), file=f_preds)
+        #                 f_preds.flush()
+        #                 total_acc.append(acc)
+        # test_acc = float(sum(total_acc))/len(total_acc)
 
-        print('-' * 71)
-        print('test_acc {:7.4f}'.format(test_acc))
-        print('-' * 71)
+        # print('-' * 71)
+        # print('test_acc {:7.4f}'.format(test_acc))
+        # print('-' * 71)
 
 
 

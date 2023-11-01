@@ -301,9 +301,9 @@ def train(args):
 
             model.eval()
             dev_em, dev_f1 = evaluate_accuracy(dataset.dev(), model, False)
-            save_test_preds = args.save_model
+            save_test_preds = (epoch_id % 5 == 0)
             if not save_test_preds:
-                test_em, test_f1 = evaluate_accuracy(dataset.test(), model, True) if args.test_statements else 0.0, 0.0
+                test_em, test_f1 = evaluate_accuracy(dataset.test(), model, True) if args.test_statements else (0.0, 0.0)
             else:
                 eval_set = dataset.test()
                 total_em, total_f1 = [], []
@@ -420,11 +420,13 @@ def eval_detail(args):
                                            is_inhouse=args.inhouse, inhouse_train_qids_path=args.inhouse_train_qids,
                                            subsample=args.subsample, use_cache=args.use_cache)
 
+    tokenizer = AutoTokenizer.from_pretrained(old_args.encoder, use_fast=True)
+
     save_test_preds = args.save_model
     dev_em, dev_f1 = evaluate_accuracy(dataset.dev(), model, False)
     print('dev_em {:7.4f} | dev_f1 {:7.4f}'.format(dev_em, dev_f1))
     if not save_test_preds:
-        test_em, test_f1 = evaluate_accuracy(dataset.test(), model, True) if args.test_statements else 0.0
+        test_em, test_f1 = evaluate_accuracy(dataset.test(), model, True) if args.test_statements else (0.0, 0.0)
     else:
         eval_set = dataset.test()
         total_em, total_f1 = [], []

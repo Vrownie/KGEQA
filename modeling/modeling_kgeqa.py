@@ -229,16 +229,16 @@ class LM_KGEQA(nn.Module):
 
         sent_vecs, all_hidden_states = self.encoder(*lm_inputs, layer_id=layer_id)
 
-        ds = sent_vecs[0].size(0)
         logits, attn = self.decoder(sent_vecs.to(node_type_ids.device),
                                     concept_ids,
                                     node_type_ids, node_scores, adj_lengths, adj,
                                     emb_data=None, cache_output=cache_output)
-        logits = logits.view(bs, nc, ds, 2)
+        logits = logits.view(bs, nc, -1, 2)
         if not detail:
             return logits, attn
         else:
-            return logits, attn, concept_ids.view(bs, nc, -1), node_type_ids.view(bs, nc, -1), edge_index_orig, edge_type_orig
+            # return logits, attn, concept_ids.view(bs, nc, -1), node_type_ids.view(bs, nc, -1), edge_index_orig, edge_type_orig
+            return logits, attn, inputs[0]
             #edge_index_orig: list of (batch_size, num_choice). each entry is torch.tensor(2, E)
             #edge_type_orig: list of (batch_size, num_choice). each entry is torch.tensor(E, )
 

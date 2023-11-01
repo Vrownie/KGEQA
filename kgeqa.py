@@ -318,16 +318,16 @@ def train(args):
                             s_e = logits.squeeze(1).argmax(1)
                             for qid, label, start_end, sent_vec in zip(qids, labels, s_e, sent_vecs):
                                 count += 1
-                                len_pred = max(start_end[1] - start_end[0], 0)
-                                len_true = max(label[1] - label[0], 0)
-                                len_match = max(min(start_end[1], label[1]) - max(start_end[0], label[0]), 0)
+                                len_pred = max(start_end[1] - start_end[0], 0.00001)
+                                len_true = max(label[1] - label[0], 0.00001)
+                                len_match = max(min(start_end[1], label[1]) - max(start_end[0], label[0]), 0.00001)
                                 precision, recall = len_match / len_pred, len_match / len_true
                                 total_f1.append(2 * precision * recall / (precision + recall) if precision + recall != 0 else 0)
                                 total_em.append(float(start_end[0] == label[0] and start_end[1] == label[1]))
                                 q_str = tokenizer.decode(sent_vec.squeeze().tolist(), skip_special_tokens=True)
                                 a_str = '' if (label[0] < 0 or label[1] >= len(sent_vec.squeeze().tolist())) else tokenizer.decode(sent_vec.squeeze().tolist()[label[0]:label[1]])
                                 p_str = '' if (start_end[0] < 0 or start_end[1] >= len(sent_vec.squeeze().tolist())) else tokenizer.decode(sent_vec.squeeze().tolist()[start_end[0]:start_end[1]])
-                                print ('{},{},{},{}'.format(qid, q_str, a_str, p_str), file=f_preds)
+                                print ('"{}","{}","{}","{}"'.format(qid, q_str, a_str, p_str), file=f_preds)
                                 f_preds.flush()
                 test_em, test_f1 = sum(total_em) / count, sum(total_f1) / count
 
@@ -439,16 +439,16 @@ def eval_detail(args):
                     s_e = logits.squeeze(1).argmax(1)
                     for qid, label, start_end, sent_vec in zip(qids, labels, s_e, sent_vecs):
                         count += 1
-                        len_pred = max(start_end[1] - start_end[0], 0)
-                        len_true = max(label[1] - label[0], 0)
-                        len_match = max(min(start_end[1], label[1]) - max(start_end[0], label[0]), 0)
+                        len_pred = max(start_end[1] - start_end[0], 0.00001)
+                        len_true = max(label[1] - label[0], 0.00001)
+                        len_match = max(min(start_end[1], label[1]) - max(start_end[0], label[0]), 0.00001)
                         precision, recall = len_match / len_pred, len_match / len_true
                         total_f1.append(2 * precision * recall / (precision + recall) if precision + recall != 0 else 0)
                         total_em.append(float(start_end[0] == label[0] and start_end[1] == label[1]))
                         q_str = tokenizer.decode(sent_vec.squeeze().tolist(), skip_special_tokens=True)
                         a_str = '' if (label[0] < 0 or label[1] >= len(sent_vec.squeeze().tolist())) else tokenizer.decode(sent_vec.squeeze().tolist()[label[0]:label[1]])
                         p_str = '' if (start_end[0] < 0 or start_end[1] >= len(sent_vec.squeeze().tolist())) else tokenizer.decode(sent_vec.squeeze().tolist()[start_end[0]:start_end[1]])
-                        print ('{},{},{},{}'.format(qid, q_str, a_str, p_str), file=f_preds)
+                        print ('"{}","{}","{}","{}"'.format(qid, q_str, a_str, p_str), file=f_preds)
                         f_preds.flush()
         test_em, test_f1 = sum(total_em) / count, sum(total_f1) / count
 

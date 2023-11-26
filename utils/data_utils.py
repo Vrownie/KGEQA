@@ -375,7 +375,7 @@ def load_bert_xlnet_roberta_input_tensors(statement_jsonl_path, model_type, mode
             choices_features = []
             for ending_idx, (context, ending) in enumerate(zip(example.contexts, example.endings)):
                 tokens_a = tokenizer.tokenize(context)
-                tokens_b = tokenizer.tokenize(example.question + " " + ending)
+                tokens_b = tokenizer.tokenize(example.question)
 
                 special_tokens_count = 4 if sep_token_extra else 3
                 _truncate_seq_pair(tokens_a, tokens_b, max_seq_length - special_tokens_count)
@@ -431,7 +431,6 @@ def load_bert_xlnet_roberta_input_tensors(statement_jsonl_path, model_type, mode
                     input_ids = ([pad_token] * padding_length) + input_ids
                     input_mask = ([0 if mask_padding_with_zero else 1] * padding_length) + input_mask
                     output_mask = ([1] * padding_length) + output_mask
-
                     segment_ids = ([pad_token_segment_id] * padding_length) + segment_ids
                 else:
                     input_ids = input_ids + ([pad_token] * padding_length)

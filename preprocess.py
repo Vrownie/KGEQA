@@ -4,6 +4,7 @@ from multiprocessing import cpu_count
 from utils.convert_csqa import convert_to_entailment
 from utils.convert_csqa_extract import convert_to_extraction_entailment
 from utils.convert_obqa import convert_to_obqa_statement
+from utils.convert_squad import convert_to_squad_statement
 from utils.conceptnet import extract_english, construct_graph
 from utils.grounding import create_matcher_patterns, ground
 from utils.graph import generate_adj_data_from_grounded_concepts__use_LM
@@ -28,6 +29,11 @@ input_paths = {
         'train': './data/obqa/OpenBookQA-V1-Sep2018/Data/Additional/train_complete.jsonl',
         'dev': './data/obqa/OpenBookQA-V1-Sep2018/Data/Additional/dev_complete.jsonl',
         'test': './data/obqa/OpenBookQA-V1-Sep2018/Data/Additional/test_complete.jsonl',
+    },
+    'squad': {
+        'train': './data/squad/train.json',
+        'dev': './data/squad/dev.json',
+        'test': './data/squad/test.json',
     },
     'cpnet': {
         'csv': './data/cpnet/conceptnet-assertions-5.6.0.csv',
@@ -106,12 +112,29 @@ output_paths = {
             'test-fairseq': './data/obqa/fairseq/official/test-fact.jsonl',
         },
     },
+    'squad': {
+        'statement': {
+            'train': './data/squad/statement/train.statement.jsonl',
+            'dev': './data/squad/statement/dev.statement.jsonl',
+            'test': './data/squad/statement/test.statement.jsonl',
+        },
+        'grounded': {
+            'train': './data/squad/grounded/train.grounded.jsonl',
+            'dev': './data/squad/grounded/dev.grounded.jsonl',
+            'test': './data/squad/grounded/test.grounded.jsonl',
+        },
+        'graph': {
+            'adj-train': './data/squad/graph/train.graph.adj.pk',
+            'adj-dev': './data/squad/graph/dev.graph.adj.pk',
+            'adj-test': './data/squad/graph/test.graph.adj.pk',
+        },
+    },
 }
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--run', default=['common'], choices=['common', 'csqa', 'csqa-extract', 'hswag', 'anli', 'exp', 'scitail', 'phys', 'socialiqa', 'obqa', 'obqa-fact', 'make_word_vocab'], nargs='+')
+    parser.add_argument('--run', default=['common'], choices=['common', 'csqa', 'csqa-extract', 'squad', 'hswag', 'anli', 'exp', 'scitail', 'phys', 'socialiqa', 'obqa', 'obqa-fact', 'make_word_vocab'], nargs='+')
     parser.add_argument('--path_prune_threshold', type=float, default=0.12, help='threshold for pruning paths')
     parser.add_argument('--max_node_num', type=int, default=200, help='maximum number of nodes per graph')
     parser.add_argument('-p', '--nprocs', type=int, default=cpu_count(), help='number of processes to use')
@@ -151,15 +174,30 @@ def main():
             {'func': convert_to_extraction_entailment, 'args': (input_paths['csqa-extract']['train'], output_paths['csqa-extract']['statement']['train'])},
             {'func': convert_to_extraction_entailment, 'args': (input_paths['csqa-extract']['dev'], output_paths['csqa-extract']['statement']['dev'])},
             {'func': convert_to_extraction_entailment, 'args': (input_paths['csqa-extract']['test'], output_paths['csqa-extract']['statement']['test'])},
-            # {'func': ground, 'args': (output_paths['csqa-extract']['statement']['train'], output_paths['cpnet']['vocab'],
-            #                           output_paths['cpnet']['patterns'], output_paths['csqa-extract']['grounded']['train'], args.nprocs)},
-            # {'func': ground, 'args': (output_paths['csqa-extract']['statement']['dev'], output_paths['cpnet']['vocab'],
-            #                           output_paths['cpnet']['patterns'], output_paths['csqa-extract']['grounded']['dev'], args.nprocs)},
-            # {'func': ground, 'args': (output_paths['csqa-extract']['statement']['test'], output_paths['cpnet']['vocab'],
-            #                           output_paths['cpnet']['patterns'], output_paths['csqa-extract']['grounded']['test'], args.nprocs)},
-            # {'func': generate_adj_data_from_grounded_concepts__use_LM, 'args': (output_paths['csqa-extract']['grounded']['train'], output_paths['cpnet']['pruned-graph'], output_paths['cpnet']['vocab'], output_paths['csqa-extract']['graph']['adj-train'], args.nprocs)},
-            # {'func': generate_adj_data_from_grounded_concepts__use_LM, 'args': (output_paths['csqa-extract']['grounded']['dev'], output_paths['cpnet']['pruned-graph'], output_paths['cpnet']['vocab'], output_paths['csqa-extract']['graph']['adj-dev'], args.nprocs)},
-            # {'func': generate_adj_data_from_grounded_concepts__use_LM, 'args': (output_paths['csqa-extract']['grounded']['test'], output_paths['cpnet']['pruned-graph'], output_paths['cpnet']['vocab'], output_paths['csqa-extract']['graph']['adj-test'], args.nprocs)},
+            {'func': ground, 'args': (output_paths['csqa-extract']['statement']['train'], output_paths['cpnet']['vocab'],
+                                      output_paths['cpnet']['patterns'], output_paths['csqa-extract']['grounded']['train'], args.nprocs)},
+            {'func': ground, 'args': (output_paths['csqa-extract']['statement']['dev'], output_paths['cpnet']['vocab'],
+                                      output_paths['cpnet']['patterns'], output_paths['csqa-extract']['grounded']['dev'], args.nprocs)},
+            {'func': ground, 'args': (output_paths['csqa-extract']['statement']['test'], output_paths['cpnet']['vocab'],
+                                      output_paths['cpnet']['patterns'], output_paths['csqa-extract']['grounded']['test'], args.nprocs)},
+            {'func': generate_adj_data_from_grounded_concepts__use_LM, 'args': (output_paths['csqa-extract']['grounded']['train'], output_paths['cpnet']['pruned-graph'], output_paths['cpnet']['vocab'], output_paths['csqa-extract']['graph']['adj-train'], args.nprocs)},
+            {'func': generate_adj_data_from_grounded_concepts__use_LM, 'args': (output_paths['csqa-extract']['grounded']['dev'], output_paths['cpnet']['pruned-graph'], output_paths['cpnet']['vocab'], output_paths['csqa-extract']['graph']['adj-dev'], args.nprocs)},
+            {'func': generate_adj_data_from_grounded_concepts__use_LM, 'args': (output_paths['csqa-extract']['grounded']['test'], output_paths['cpnet']['pruned-graph'], output_paths['cpnet']['vocab'], output_paths['csqa-extract']['graph']['adj-test'], args.nprocs)},
+        ],
+
+        'squad': [
+            # {'func': convert_to_squad_statement, 'args': (input_paths['squad']['train'], output_paths['squad']['statement']['train'])},
+            # {'func': convert_to_squad_statement, 'args': (input_paths['squad']['dev'], output_paths['squad']['statement']['dev'])},
+            # {'func': convert_to_squad_statement, 'args': (input_paths['squad']['test'], output_paths['squad']['statement']['test'])},
+            # {'func': ground, 'args': (output_paths['squad']['statement']['train'], output_paths['cpnet']['vocab'],
+            #                           output_paths['cpnet']['patterns'], output_paths['squad']['grounded']['train'], args.nprocs)},
+            # {'func': ground, 'args': (output_paths['squad']['statement']['dev'], output_paths['cpnet']['vocab'],
+            #                           output_paths['cpnet']['patterns'], output_paths['squad']['grounded']['dev'], args.nprocs)},
+            # {'func': ground, 'args': (output_paths['squad']['statement']['test'], output_paths['cpnet']['vocab'],
+            #                           output_paths['cpnet']['patterns'], output_paths['squad']['grounded']['test'], args.nprocs)},
+            {'func': generate_adj_data_from_grounded_concepts__use_LM, 'args': (output_paths['squad']['grounded']['train'], output_paths['cpnet']['pruned-graph'], output_paths['cpnet']['vocab'], output_paths['squad']['graph']['adj-train'], args.nprocs)},
+            {'func': generate_adj_data_from_grounded_concepts__use_LM, 'args': (output_paths['squad']['grounded']['dev'], output_paths['cpnet']['pruned-graph'], output_paths['cpnet']['vocab'], output_paths['squad']['graph']['adj-dev'], args.nprocs)},
+            # {'func': generate_adj_data_from_grounded_concepts__use_LM, 'args': (output_paths['squad']['grounded']['test'], output_paths['cpnet']['pruned-graph'], output_paths['cpnet']['vocab'], output_paths['squad']['graph']['adj-test'], args.nprocs)},
         ],
 
         'obqa': [

@@ -275,7 +275,8 @@ class RobertaForMaskedLMwithLoss(RobertaForMaskedLM):
 print ('loading pre-trained LM...')
 TOKENIZER = RobertaTokenizer.from_pretrained('roberta-large')
 LM_MODEL = RobertaForMaskedLMwithLoss.from_pretrained('roberta-large')
-LM_MODEL.cuda(); LM_MODEL.eval()
+LM_MODEL.cuda()
+LM_MODEL.eval()
 print ('loading done')
 
 def get_LM_score(cids, question):
@@ -299,7 +300,8 @@ def get_LM_score(cids, question):
         for j, seq in enumerate(input_ids):
             seq += [TOKENIZER.pad_token_id] * (max_len-len(seq))
             input_ids[j] = seq
-        input_ids = torch.tensor(input_ids).cuda() #[B, seqlen]
+        input_ids = torch.tensor(input_ids)
+        input_ids = input_ids.cuda() #[B, seqlen]
         mask = (input_ids!=1).long() #[B, seq_len]
         #Get LM score
         with torch.no_grad():

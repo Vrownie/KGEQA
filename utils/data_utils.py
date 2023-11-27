@@ -443,9 +443,12 @@ def load_bert_xlnet_roberta_input_tensors(statement_jsonl_path, model_type, mode
                 assert len(input_mask) == max_seq_length
                 assert len(segment_ids) == max_seq_length
                 choices_features.append((tokens, input_ids, input_mask, segment_ids, output_mask))
-            # label = label_map[example.label]
             encodings = tokenizer(example.contexts[0])
-            label = [encodings.char_to_token(example.label[0]), encodings.char_to_token(example.label[1])]
+            if example.label[0] < 0 and example.label[1] < 0:
+                label = [0, 0]
+            else: 
+                label = [encodings.char_to_token(example.label[0]), encodings.char_to_token(example.label[1]-1)]
+            assert label[0] is not None and label[1] is not None
             features.append(InputFeatures(example_id=example.example_id, choices_features=choices_features, label=label))
 
         return features
@@ -477,10 +480,6 @@ def load_bert_xlnet_roberta_input_tensors(statement_jsonl_path, model_type, mode
         all_label = torch.tensor([f.label for f in features], dtype=torch.long)
         return all_input_ids, all_input_mask, all_segment_ids, all_output_mask, all_label
 
-    # try:
-    #     tokenizer_class = {'bert': BertTokenizer, 'xlnet': XLNetTokenizer, 'roberta': RobertaTokenizer, 'albert': AlbertTokenizer}.get(model_type)
-    # except:
-    #     tokenizer_class = {'bert': BertTokenizer, 'xlnet': XLNetTokenizer, 'roberta': RobertaTokenizer}.get(model_type)
     tokenizer_class = AutoTokenizer
     tokenizer = tokenizer_class.from_pretrained(model_name, use_fast=True)
     if for_kgeqa: 

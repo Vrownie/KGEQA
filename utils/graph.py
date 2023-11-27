@@ -288,7 +288,7 @@ def get_LM_score(cids, question):
             sent = question.lower()
         else:
             sent = '{} {}.'.format(question.lower(), ' '.join(id2concept[cid].split('_')))
-        sent = TOKENIZER.encode(sent, add_special_tokens=True)
+        sent = TOKENIZER.encode(sent, add_special_tokens=True, truncation=True, max_length=512)
         sents.append(sent)
     n_cids = len(cids)
     cur_idx = 0
@@ -493,6 +493,7 @@ def generate_adj_data_from_grounded_concepts__use_LM(grounded_path, cpnet_graph_
         lines_state  = fin_state.readlines()
         assert len(lines_ground) % len(lines_state) == 0
         n_choices = len(lines_ground) // len(lines_state)
+        print(f"THERE ARE {n_choices} CHOICES PER QUESTION")
         for j, line in enumerate(lines_ground):
             dic = json.loads(line)
             q_ids = set(concept2id[c] for c in dic['qc'])
@@ -506,8 +507,7 @@ def generate_adj_data_from_grounded_concepts__use_LM(grounded_path, cpnet_graph_
         res1 = list(tqdm(p.imap(concepts_to_adj_matrices_2hop_all_pair__use_LM__Part1, qa_data), total=len(qa_data)))
 
     res2 = []
-    for j, _data in enumerate(res1):
-        if j % 100 == 0: print (j)
+    for _data in tqdm(res1):
         res2.append(concepts_to_adj_matrices_2hop_all_pair__use_LM__Part2(_data))
 
     with Pool(num_processes) as p:

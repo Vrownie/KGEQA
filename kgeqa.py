@@ -15,6 +15,7 @@ from utils.parser_utils import *
 DECODER_DEFAULT_LR = {
     'csqa': 1e-3,
     'csqa_extract': 1e-3,
+    'squad': 1e-3,
     'obqa': 3e-4,
     'medqa_usmle': 1e-3,
 }
@@ -160,15 +161,16 @@ def train(args):
         ###################################################################################################
         #   Build model                                                                                   #
         ###################################################################################################
+        has_unanswerable = (args.dataset == 'squad')
+        if has_unanswerable: 
+            print("dataset has unanswerable questions! these will have label [0,0]")
         print ('args.num_relation', args.num_relation)
         model = LM_KGEQA(args, args.encoder, k=args.k, n_ntype=4, n_etype=args.num_relation, n_concept=concept_num,
-                                   concept_dim=args.gnn_dim,
-                                   concept_in_dim=concept_dim,
+                                   concept_dim=args.gnn_dim, concept_in_dim=concept_dim,
                                    n_attention_head=args.att_head_num, fc_dim=args.fc_dim, n_fc_layer=args.fc_layer_num,
                                    p_emb=args.dropouti, p_gnn=args.dropoutg, p_fc=args.dropoutf,
                                    pretrained_concept_emb=cp_emb, freeze_ent_emb=args.freeze_ent_emb,
-                                   init_range=args.init_range,
-                                   encoder_config={})
+                                   init_range=args.init_range, encoder_config={}, has_unanswerable=False) # TODO: ?
         if args.load_model_path:
             print (f'loading and initializing model from {args.load_model_path}')
             model_state_dict, old_args = torch.load(args.load_model_path, map_location=torch.device('cpu'))
@@ -214,22 +216,7 @@ def train(args):
     num_params = sum(p.numel() for p in model.decoder.parameters() if p.requires_grad)
     print('\ttotal:', num_params)
 
-    # if args.loss == 'margin_rank':
-    #     loss_func = nn.MarginRankingLoss(margin=0.1, reduction='mean')
-    # elif args.loss == 'cross_entropy':
-    #     loss_func = nn.CrossEntropyLoss(reduction='mean')
-
     def compute_loss(logits, labels):
-        # if args.loss == 'margin_rank':
-        #     num_choice = logits.size(1)
-        #     flat_logits = logits.view(-1)
-        #     correct_mask = F.one_hot(labels, num_classes=num_choice).view(-1)  # of length batch_size*num_choice
-        #     correct_logits = flat_logits[correct_mask == 1].contiguous().view(-1, 1).expand(-1, num_choice - 1).contiguous().view(-1)  # of length batch_size*(num_choice-1)
-        #     wrong_logits = flat_logits[correct_mask == 0]
-        #     y = wrong_logits.new_ones((wrong_logits.size(0),))
-        #     loss = loss_func(correct_logits, wrong_logits, y)  # margin ranking loss
-        # elif args.loss == 'cross_entropy':
-        #     loss = loss_func(logits, labels)
         loss_func = nn.CrossEntropyLoss(reduction='mean')
         s_loss = loss_func(logits.squeeze(1)[..., 0], labels[..., 0])
         e_loss = loss_func(logits.squeeze(1)[..., 1], labels[..., 1])

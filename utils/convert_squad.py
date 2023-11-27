@@ -70,6 +70,7 @@ def convert_qajson_to_entailment(qa_json: dict, ans_pos: bool, ctx: str):
     to_return['question'] = {}
     to_return['question']['stem'] = context_text + " " + question_text
     to_return['question']['choices'] = []
+    to_return['answerKey'] = 'A'
 
     for i, choice in enumerate(choices):
         one_choice = {}
@@ -86,13 +87,15 @@ def convert_qajson_to_entailment(qa_json: dict, ans_pos: bool, ctx: str):
         else:
             statement, pos = create_hypothesis(get_fitb_from_question(question_text), choice_text, ans_pos)
         create_output_dict(to_return, statement, True, ans_pos, pos)
+
+        break  #TODO: currently only using the first possible answer...
     
     if len(choices) == 0:
         one_choice = {}
         one_choice['label'] = 'A'
         one_choice['text'] = "no answer"
-        one_choice['start'] = -1
-        one_choice['end'] = -1
+        one_choice['start'] = 0
+        one_choice['end'] = 0
         to_return['question']['choices'].append(one_choice)
 
         choice_text = "no answer"
@@ -102,6 +105,9 @@ def convert_qajson_to_entailment(qa_json: dict, ans_pos: bool, ctx: str):
         else:
             statement, pos = create_hypothesis(get_fitb_from_question(question_text), choice_text, ans_pos)
         create_output_dict(to_return, statement, True, ans_pos, pos)
+    
+    to_return["answerStart"] = to_return['question']['choices'][0]['start']
+    to_return["answerEnd"] = to_return['question']['choices'][0]['end']
 
     return to_return
 

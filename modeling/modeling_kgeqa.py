@@ -101,7 +101,7 @@ class KGEQA(nn.Module):
                  n_concept, concept_dim, concept_in_dim, n_attention_head,
                  fc_dim, n_fc_layer, p_emb, p_gnn, p_fc,
                  pretrained_concept_emb=None, freeze_ent_emb=True,
-                 init_range=0.02):
+                 init_range=0.02, has_unanswerable=False):
         super().__init__()
         self.init_range = init_range
 
@@ -119,7 +119,7 @@ class KGEQA(nn.Module):
 
         self.pooler = MultiheadAttPoolLayer(n_attention_head, sent_dim, concept_dim)
 
-        self.fc = MLP(concept_dim + sent_dim + concept_dim, fc_dim, 2 * sent_dim, n_fc_layer, p_fc, layer_norm=True)
+        self.fc = MLP(concept_dim + sent_dim + concept_dim, fc_dim, 2 * (sent_dim + has_unanswerable), n_fc_layer, p_fc, layer_norm=True)
 
         self.dropout_e = nn.Dropout(p_emb)
         self.dropout_fc = nn.Dropout(p_fc)
@@ -194,14 +194,14 @@ class LM_KGEQA(nn.Module):
                  n_concept, concept_dim, concept_in_dim, n_attention_head,
                  fc_dim, n_fc_layer, p_emb, p_gnn, p_fc,
                  pretrained_concept_emb=None, freeze_ent_emb=True,
-                 init_range=0.0, encoder_config={}):
+                 init_range=0.0, encoder_config={}, has_unanswerable=False):
         super().__init__()
         self.encoder = TextEncoder(model_name, **encoder_config)
         self.decoder = KGEQA(args, k, n_ntype, n_etype, self.encoder.sent_dim,
                                         n_concept, concept_dim, concept_in_dim, n_attention_head,
                                         fc_dim, n_fc_layer, p_emb, p_gnn, p_fc,
                                         pretrained_concept_emb=pretrained_concept_emb, freeze_ent_emb=freeze_ent_emb,
-                                        init_range=init_range)
+                                        init_range=init_range, has_unanswerable=has_unanswerable)
 
 
     def forward(self, *inputs, layer_id=-1, cache_output=False, detail=False):
@@ -237,10 +237,7 @@ class LM_KGEQA(nn.Module):
         if not detail:
             return logits, attn
         else:
-            # return logits, attn, concept_ids.view(bs, nc, -1), node_type_ids.view(bs, nc, -1), edge_index_orig, edge_type_orig
             return logits, attn, inputs[0]
-            #edge_index_orig: list of (batch_size, num_choice). each entry is torch.tensor(2, E)
-            #edge_type_orig: list of (batch_size, num_choice). each entry is torch.tensor(E, )
 
 
     def batch_graph(self, edge_index_init, edge_type_init, n_nodes):

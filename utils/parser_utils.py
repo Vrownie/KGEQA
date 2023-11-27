@@ -25,6 +25,13 @@ ENCODER_DEFAULT_LR = {
         'bert-large-uncased': 2e-5,
         'roberta-large': 1e-5,
     },
+    'squad1': {
+        'lstm': 3e-4,
+        'openai-gpt': 1e-4,
+        'bert-base-uncased': 3e-5,
+        'bert-large-uncased': 2e-5,
+        'roberta-large': 1e-5,
+    },
     'obqa': {
         'lstm': 3e-4,
         'openai-gpt': 3e-5,
@@ -37,12 +44,13 @@ ENCODER_DEFAULT_LR = {
     },
 }
 
-DATASET_LIST = ['csqa', 'obqa', 'socialiqa', 'medqa_usmle', 'csqa_extract', 'squad']
+DATASET_LIST = ['csqa', 'obqa', 'socialiqa', 'medqa_usmle', 'csqa_extract', 'squad', 'squad1']
 
 DATASET_SETTING = {
     'csqa': 'inhouse',
     'csqa_extract': 'inhouse',
     'squad': 'official',
+    'squad1': 'official',
     'obqa': 'official',
     'socialiqa': 'official',
     'medqa_usmle': 'official',
@@ -107,8 +115,8 @@ def add_optimization_arguments(parser):
 
 
 def add_additional_arguments(parser):
-    parser.add_argument('--log_interval', default=10, type=int)
-    parser.add_argument('--cuda', default=True, type=bool_flag, nargs='?', const=True, help='use GPU')
+    parser.add_argument('--log_interval', default=1, type=int)
+    parser.add_argument('--cuda', default=6, type=int, help='use which CUDA device')
     parser.add_argument('--seed', default=0, type=int, help='random seed')
     parser.add_argument('--debug', default=False, type=bool_flag, nargs='?', const=True, help='run in debug mode')
     args, _ = parser.parse_known_args()

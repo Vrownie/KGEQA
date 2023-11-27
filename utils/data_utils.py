@@ -445,7 +445,7 @@ def load_bert_xlnet_roberta_input_tensors(statement_jsonl_path, model_type, mode
                 choices_features.append((tokens, input_ids, input_mask, segment_ids, output_mask))
             encodings = tokenizer(example.contexts[0])
             if example.label[0] < 0 and example.label[1] < 0:
-                label = [0, 0]
+                label = [-1, -1]
             else: 
                 label = [encodings.char_to_token(example.label[0]), encodings.char_to_token(example.label[1]-1)]
             assert label[0] is not None and label[1] is not None

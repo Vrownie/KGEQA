@@ -33,7 +33,10 @@ input_paths = {
     'squad': {
         'train': './data/squad/train.json',
         'dev': './data/squad/dev.json',
-        'test': './data/squad/test.json',
+    },
+    'squad1': {
+        'train': './data/squad1/train.json',
+        'dev': './data/squad1/dev.json',
     },
     'cpnet': {
         'csv': './data/cpnet/conceptnet-assertions-5.6.0.csv',
@@ -116,17 +119,28 @@ output_paths = {
         'statement': {
             'train': './data/squad/statement/train.statement.jsonl',
             'dev': './data/squad/statement/dev.statement.jsonl',
-            'test': './data/squad/statement/test.statement.jsonl',
         },
         'grounded': {
             'train': './data/squad/grounded/train.grounded.jsonl',
             'dev': './data/squad/grounded/dev.grounded.jsonl',
-            'test': './data/squad/grounded/test.grounded.jsonl',
         },
         'graph': {
             'adj-train': './data/squad/graph/train.graph.adj.pk',
             'adj-dev': './data/squad/graph/dev.graph.adj.pk',
-            'adj-test': './data/squad/graph/test.graph.adj.pk',
+        },
+    },
+    'squad1': {
+        'statement': {
+            'train': './data/squad1/statement/train.statement.jsonl',
+            'dev': './data/squad1/statement/dev.statement.jsonl',
+        },
+        'grounded': {
+            'train': './data/squad1/grounded/train.grounded.jsonl',
+            'dev': './data/squad1/grounded/dev.grounded.jsonl',
+        },
+        'graph': {
+            'adj-train': './data/squad1/graph/train.graph.adj.pk',
+            'adj-dev': './data/squad1/graph/dev.graph.adj.pk',
         },
     },
 }
@@ -134,7 +148,7 @@ output_paths = {
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--run', default=['common'], choices=['common', 'csqa', 'csqa-extract', 'squad', 'hswag', 'anli', 'exp', 'scitail', 'phys', 'socialiqa', 'obqa', 'obqa-fact', 'make_word_vocab'], nargs='+')
+    parser.add_argument('--run', default=['common'], choices=['common', 'csqa', 'csqa-extract', 'squad', 'squad1', 'hswag', 'anli', 'exp', 'scitail', 'phys', 'socialiqa', 'obqa', 'obqa-fact', 'make_word_vocab'], nargs='+')
     parser.add_argument('--path_prune_threshold', type=float, default=0.12, help='threshold for pruning paths')
     parser.add_argument('--max_node_num', type=int, default=200, help='maximum number of nodes per graph')
     parser.add_argument('-p', '--nprocs', type=int, default=cpu_count(), help='number of processes to use')
@@ -188,16 +202,23 @@ def main():
         'squad': [
             {'func': convert_to_squad_statement, 'args': (input_paths['squad']['dev'], output_paths['squad']['statement']['dev'])},
             {'func': convert_to_squad_statement, 'args': (input_paths['squad']['train'], output_paths['squad']['statement']['train'])},
-            # # {'func': convert_to_squad_statement, 'args': (input_paths['squad']['test'], output_paths['squad']['statement']['test'])},
             {'func': ground, 'args': (output_paths['squad']['statement']['dev'], output_paths['cpnet']['vocab'],
                                       output_paths['cpnet']['patterns'], output_paths['squad']['grounded']['dev'], args.nprocs)},
             {'func': ground, 'args': (output_paths['squad']['statement']['train'], output_paths['cpnet']['vocab'],
                                       output_paths['cpnet']['patterns'], output_paths['squad']['grounded']['train'], args.nprocs)},
-            # {'func': ground, 'args': (output_paths['squad']['statement']['test'], output_paths['cpnet']['vocab'],
-            #                           output_paths['cpnet']['patterns'], output_paths['squad']['grounded']['test'], args.nprocs)},
             {'func': generate_adj_data_from_grounded_concepts__use_LM, 'args': (output_paths['squad']['grounded']['dev'], output_paths['cpnet']['pruned-graph'], output_paths['cpnet']['vocab'], output_paths['squad']['graph']['adj-dev'], args.nprocs)},
             {'func': generate_adj_data_from_grounded_concepts__use_LM, 'args': (output_paths['squad']['grounded']['train'], output_paths['cpnet']['pruned-graph'], output_paths['cpnet']['vocab'], output_paths['squad']['graph']['adj-train'], args.nprocs)},
-            # {'func': generate_adj_data_from_grounded_concepts__use_LM, 'args': (output_paths['squad']['grounded']['test'], output_paths['cpnet']['pruned-graph'], output_paths['cpnet']['vocab'], output_paths['squad']['graph']['adj-test'], args.nprocs)},
+        ],
+
+        'squad1': [
+            # {'func': convert_to_squad_statement, 'args': (input_paths['squad1']['dev'], output_paths['squad1']['statement']['dev'])},
+            # {'func': convert_to_squad_statement, 'args': (input_paths['squad1']['train'], output_paths['squad1']['statement']['train'])},
+            {'func': ground, 'args': (output_paths['squad1']['statement']['dev'], output_paths['cpnet']['vocab'],
+                                      output_paths['cpnet']['patterns'], output_paths['squad1']['grounded']['dev'], args.nprocs)},
+            {'func': ground, 'args': (output_paths['squad1']['statement']['train'], output_paths['cpnet']['vocab'],
+                                      output_paths['cpnet']['patterns'], output_paths['squad1']['grounded']['train'], args.nprocs)},
+            {'func': generate_adj_data_from_grounded_concepts__use_LM, 'args': (output_paths['squad1']['grounded']['dev'], output_paths['cpnet']['pruned-graph'], output_paths['cpnet']['vocab'], output_paths['squad1']['graph']['adj-dev'], args.nprocs)},
+            {'func': generate_adj_data_from_grounded_concepts__use_LM, 'args': (output_paths['squad1']['grounded']['train'], output_paths['cpnet']['pruned-graph'], output_paths['cpnet']['vocab'], output_paths['squad1']['graph']['adj-train'], args.nprocs)},
         ],
 
         'obqa': [

@@ -183,7 +183,7 @@ def train(args):
         model = LM_KGEQA(args, args.encoder, k=args.k, n_ntype=4, n_etype=args.num_relation, n_concept=concept_num,
                                    concept_dim=args.gnn_dim, concept_in_dim=concept_dim,
                                    n_attention_head=args.att_head_num, fc_dim=args.fc_dim, n_fc_layer=args.fc_layer_num,
-                                   p_emb=args.dropouti, p_gnn=args.dropoutg, p_fc=args.dropoutf,
+                                   p_emb=args.dropouti, p_gnn=args.dropoutg, p_fc=args.dropoutf, seq_len=args.max_seq_len,
                                    pretrained_concept_emb=cp_emb, freeze_ent_emb=args.freeze_ent_emb,
                                    init_range=args.init_range, encoder_config={}, has_unanswerable=False) # TODO: ?
         if args.load_model_path:
@@ -381,8 +381,8 @@ def train(args):
                 print(f'model saved to {model_path}.{epoch_id}')
         model.train()
         start_time = time.time()
-        if epoch_id > args.unfreeze_epoch and epoch_id - best_dev_epoch >= args.max_epochs_before_stop:
-            break
+        # if epoch_id > args.unfreeze_epoch and epoch_id - best_dev_epoch >= args.max_epochs_before_stop:
+            # break
 
 
 def eval_detail(args):
@@ -396,10 +396,9 @@ def eval_detail(args):
 
     model_state_dict, old_args = torch.load(model_path, map_location=torch.device('cpu'))
     model = LM_KGEQA(old_args, old_args.encoder, k=old_args.k, n_ntype=4, n_etype=old_args.num_relation, n_concept=concept_num,
-                               concept_dim=old_args.gnn_dim,
-                               concept_in_dim=concept_dim,
+                               concept_dim=old_args.gnn_dim, concept_in_dim=concept_dim,
                                n_attention_head=old_args.att_head_num, fc_dim=old_args.fc_dim, n_fc_layer=old_args.fc_layer_num,
-                               p_emb=old_args.dropouti, p_gnn=old_args.dropoutg, p_fc=old_args.dropoutf,
+                               p_emb=old_args.dropouti, p_gnn=old_args.dropoutg, p_fc=old_args.dropoutf, seq_len=old_args.max_seq_len,
                                pretrained_concept_emb=cp_emb, freeze_ent_emb=old_args.freeze_ent_emb,
                                init_range=old_args.init_range,
                                encoder_config={})

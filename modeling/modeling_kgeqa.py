@@ -99,7 +99,7 @@ class KGEQA_Message_Passing(nn.Module):
 class KGEQA(nn.Module):
     def __init__(self, args, k, n_ntype, n_etype, sent_dim,
                  n_concept, concept_dim, concept_in_dim, n_attention_head,
-                 fc_dim, n_fc_layer, p_emb, p_gnn, p_fc,
+                 fc_dim, n_fc_layer, p_emb, p_gnn, p_fc, seq_len, 
                  pretrained_concept_emb=None, freeze_ent_emb=True,
                  init_range=0.02, has_unanswerable=False):
         super().__init__()
@@ -119,7 +119,7 @@ class KGEQA(nn.Module):
 
         self.pooler = MultiheadAttPoolLayer(n_attention_head, sent_dim, concept_dim)
 
-        self.fc = MLP(concept_dim + sent_dim + concept_dim, fc_dim, 2 * (sent_dim + has_unanswerable), n_fc_layer, p_fc, layer_norm=True)
+        self.fc = MLP(sent_dim + 2 * concept_dim, fc_dim, 2, n_fc_layer, p_fc, layer_norm=True)
 
         self.dropout_e = nn.Dropout(p_emb)
         self.dropout_fc = nn.Dropout(p_fc)
@@ -138,8 +138,9 @@ class KGEQA(nn.Module):
             module.weight.data.fill_(1.0)
 
 
-    def forward(self, sent_vecs, concept_ids, node_type_ids, node_scores, adj_lengths, adj, emb_data=None, cache_output=False):
+    def forward(self, hidden_states, sent_vecs, concept_ids, node_type_ids, node_scores, adj_lengths, adj, emb_data=None, cache_output=False):
         """
+        hidden_states: (batch_size, seq_len, dim_sent)
         sent_vecs: (batch_size, dim_sent)
         concept_ids: (batch_size, n_node)
         adj: edge_index, edge_type
@@ -166,7 +167,6 @@ class KGEQA(nn.Module):
         node_scores = node_scores / (mean_norm.unsqueeze(1) + 1e-05) #[batch_size, n_node]
         node_scores = node_scores.unsqueeze(2) #[batch_size, n_node, 1]
 
-
         gnn_output = self.gnn(gnn_input, adj, node_type_ids, node_scores)
 
         Z_vecs = gnn_output[:,0]   #(batch_size, dim_node)
@@ -184,22 +184,24 @@ class KGEQA(nn.Module):
             self.adj = adj
             self.pool_attn = pool_attn
 
-        concat = self.dropout_fc(torch.cat((graph_vecs, sent_vecs, Z_vecs), 1))
-        logits = self.fc(concat)
+        to_cat = torch.cat([Z_vecs, graph_vecs], -1).unsqueeze(1)
+        to_cat = torch.cat([to_cat] * hidden_states.shape[1], 1)
+        concat = torch.cat([hidden_states, to_cat], -1)
+        logits = self.fc(self.dropout_fc(concat))
         return logits, pool_attn
 
 
 class LM_KGEQA(nn.Module):
     def __init__(self, args, model_name, k, n_ntype, n_etype,
                  n_concept, concept_dim, concept_in_dim, n_attention_head,
-                 fc_dim, n_fc_layer, p_emb, p_gnn, p_fc,
+                 fc_dim, n_fc_layer, p_emb, p_gnn, p_fc, seq_len,
                  pretrained_concept_emb=None, freeze_ent_emb=True,
                  init_range=0.0, encoder_config={}, has_unanswerable=False):
         super().__init__()
         self.encoder = TextEncoder(model_name, **encoder_config)
         self.decoder = KGEQA(args, k, n_ntype, n_etype, self.encoder.sent_dim,
                                         n_concept, concept_dim, concept_in_dim, n_attention_head,
-                                        fc_dim, n_fc_layer, p_emb, p_gnn, p_fc,
+                                        fc_dim, n_fc_layer, p_emb, p_gnn, p_fc, seq_len,
                                         pretrained_concept_emb=pretrained_concept_emb, freeze_ent_emb=freeze_ent_emb,
                                         init_range=init_range, has_unanswerable=has_unanswerable)
 
@@ -217,7 +219,6 @@ class LM_KGEQA(nn.Module):
                                                          -> (total E, )
         returns: (batch_size, 1)
         """
-        bs, nc = inputs[0].size(0), inputs[0].size(1)
 
         #Here, merge the batch dimension and the num_choice dimension
         edge_index_orig, edge_type_orig = inputs[-2:]
@@ -229,11 +230,11 @@ class LM_KGEQA(nn.Module):
 
         sent_vecs, all_hidden_states = self.encoder(*lm_inputs, layer_id=layer_id)
 
-        logits, attn = self.decoder(sent_vecs.to(node_type_ids.device),
-                                    concept_ids,
+        logits, attn = self.decoder(all_hidden_states[layer_id].to(node_type_ids.device),
+                                    sent_vecs.to(node_type_ids.device), concept_ids,
                                     node_type_ids, node_scores, adj_lengths, adj,
                                     emb_data=None, cache_output=cache_output)
-        logits = logits.view(bs, nc, -1, 2)
+        logits = logits.unsqueeze(1)
         if not detail:
             return logits, attn
         else:

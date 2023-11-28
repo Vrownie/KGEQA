@@ -68,7 +68,8 @@ def convert_qajson_to_entailment(qa_json: dict, ans_pos: bool, ctx: str):
     to_return = {}
     to_return['id'] = qa_json['id']
     to_return['question'] = {}
-    to_return['question']['stem'] = context_text + " " + question_text
+    to_return['question']['stem'] = question_text
+    to_return['question']['context'] = context_text
     to_return['question']['choices'] = []
     to_return['answerKey'] = 'A'
 

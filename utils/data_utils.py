@@ -343,7 +343,7 @@ def load_bert_xlnet_roberta_input_tensors(statement_jsonl_path, model_type, mode
                     InputExample(
                         example_id=json_dic["id"],
                         contexts=[contexts] * len(json_dic["question"]["choices"]),
-                        question="",
+                        question=json_dic["question"]["context"],
                         endings=[ending["text"] for ending in json_dic["question"]["choices"]],
                         label=[s,e]
                     ))
@@ -403,6 +403,8 @@ def load_bert_xlnet_roberta_input_tensors(statement_jsonl_path, model_type, mode
                     # roberta uses an extra separator b/w pairs of sentences
                     tokens += [sep_token]
 
+                tokens_before_b = len(tokens)
+
                 segment_ids = [sequence_a_segment_id] * len(tokens)
 
                 if tokens_b:
@@ -422,8 +424,9 @@ def load_bert_xlnet_roberta_input_tensors(statement_jsonl_path, model_type, mode
                 # tokens are attended to.
 
                 input_mask = [1 if mask_padding_with_zero else 0] * len(input_ids)
-                special_token_id = tokenizer.convert_tokens_to_ids([cls_token, sep_token])
-                output_mask = [1 if id in special_token_id else 0 for id in input_ids]  # 1 for mask
+                # special_token_id = tokenizer.convert_tokens_to_ids([cls_token, sep_token])
+                # output_mask = [1 if id in special_token_id else 0 for id in input_ids]  # 1 for mask
+                output_mask = [1] * (2 + len(tokens_a)) + [0] * len(tokens_b) + [1]
 
                 # Zero-pad up to the sequence length.
                 padding_length = max_seq_length - len(input_ids)
@@ -443,11 +446,11 @@ def load_bert_xlnet_roberta_input_tensors(statement_jsonl_path, model_type, mode
                 assert len(input_mask) == max_seq_length
                 assert len(segment_ids) == max_seq_length
                 choices_features.append((tokens, input_ids, input_mask, segment_ids, output_mask))
-            encodings = tokenizer(example.contexts[0])
-            if example.label[0] < 0 and example.label[1] < 0:
-                label = [-1, -1]
-            else: 
-                label = [encodings.char_to_token(example.label[0]), encodings.char_to_token(example.label[1]-1)]
+            encodings = tokenizer(example.question)
+            label = [-1, -1]
+            if not (example.label[0] <= 0 and example.label[1] <= 0):
+                label[0] = min(encodings.char_to_token(example.label[0]) + tokens_before_b, max_seq_length-1)
+                label[1] = min(encodings.char_to_token(example.label[1]-1) + tokens_before_b, max_seq_length-1)
             assert label[0] is not None and label[1] is not None
             features.append(InputFeatures(example_id=example.example_id, choices_features=choices_features, label=label))
 
@@ -455,19 +458,11 @@ def load_bert_xlnet_roberta_input_tensors(statement_jsonl_path, model_type, mode
 
     def _truncate_seq_pair(tokens_a, tokens_b, max_length):
         """Truncates a sequence pair in place to the maximum length."""
-
-        # This is a simple heuristic which will always truncate the longer sequence
-        # one token at a time. This makes more sense than truncating an equal percent
-        # of tokens from each, since if one sequence is very short then each token
-        # that's truncated likely contains more information than a longer sequence.
         while True:
             total_length = len(tokens_a) + len(tokens_b)
             if total_length <= max_length:
                 break
-            if len(tokens_a) > len(tokens_b):
-                tokens_a.pop()
-            else:
-                tokens_b.pop()
+            tokens_b.pop()
 
     def select_field(features, field):
         return [[choice[field] for choice in feature.choices_features] for feature in features]
